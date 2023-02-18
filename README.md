@@ -1,0 +1,2 @@
+# JavassistAOP
+使用Javassist实现的AOP框架，通过改变字节码的方式实现切面编程，适用于普通Java项目
