@@ -20,12 +20,6 @@ public class BzAspect {
         Console.log(pointcut);
     }
 
-    @AfterReturning
-    public void afterReturning(Pointcut pointcut) {
-        Console.log("afterReturning");
-        Console.log(pointcut);
-    }
-
     @AfterThrowing
     public void afterThrowing(Pointcut pointcut) {
         Console.log("afterThrowing");
@@ -35,6 +29,12 @@ public class BzAspect {
     @After
     public void after(Pointcut pointcut) {
         Console.log("after");
+        Console.log(pointcut);
+    }
+
+    @AfterReturning
+    public void afterReturning(Pointcut pointcut) {
+        Console.log("afterReturning");
         Console.log(pointcut);
     }
 

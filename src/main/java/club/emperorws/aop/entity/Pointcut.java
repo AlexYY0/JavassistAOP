@@ -41,68 +41,59 @@ public class Pointcut {
     public Pointcut() {
     }
 
-    public Pointcut(Object thisProceedObj, Method method, Object[] args) {
-        this.thisProceedObj = thisProceedObj;
+    public Pointcut(Method method, Object[] args) {
         this.method = method;
         this.args = args;
-    }
-
-    public Pointcut(Object thisProceedObj, Method method, Object[] args, Object returnValue) {
-        this.thisProceedObj = thisProceedObj;
-        this.method = method;
-        this.args = args;
-        this.returnValue = returnValue;
-    }
-
-    public Pointcut(Object thisProceedObj, Method method, Object[] args, Throwable e) {
-        this.thisProceedObj = thisProceedObj;
-        this.method = method;
-        this.args = args;
-        this.e = e;
     }
 
     public Object getThisProceedObj() {
         return thisProceedObj;
     }
 
-    public void setThisProceedObj(Object thisProceedObj) {
+    public Pointcut setThisProceedObj(Object thisProceedObj) {
         this.thisProceedObj = thisProceedObj;
+        return this;
     }
 
     public Method getMethod() {
         return method;
     }
 
-    public void setMethod(Method method) {
+    public Pointcut setMethod(Method method) {
         this.method = method;
+        return this;
     }
 
     public Object[] getArgs() {
         return args;
     }
 
-    public void setArgs(Object[] args) {
+    public Pointcut setArgs(Object[] args) {
         this.args = args;
+        return this;
     }
 
     public Throwable getE() {
         return e;
     }
 
-    public void setE(Throwable e) {
+    public Pointcut setE(Throwable e) {
         this.e = e;
+        return this;
     }
 
     public Object getReturnValue() {
         return returnValue;
     }
 
-    public void setReturnValue(Object returnValue) {
+    public Pointcut setReturnValue(Object returnValue) {
         this.returnValue = returnValue;
+        return this;
     }
 
     /**
      * 反射执行切点方法
+     * {@link club.emperorws.aop.annotation.Around}注解的方法里使用，不要在其它地方使用，否则有死循环的风险
      *
      * @return 切点方法的返回结果
      * @throws Throwable 异常

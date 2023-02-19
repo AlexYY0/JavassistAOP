@@ -7,7 +7,6 @@ import club.emperorws.aop.toolkit.ClassUtils;
 import cn.hutool.core.lang.Console;
 import javassist.*;
 import javassist.bytecode.AnnotationsAttribute;
-import javassist.bytecode.AttributeInfo;
 import javassist.bytecode.annotation.Annotation;
 
 import java.util.*;
@@ -28,12 +27,18 @@ public class DoAspect {
      */
     private static final Map<String, AspectInfo> ANNOTATION_ASPECT_MAP = new HashMap<>();
 
+    private DoAspect() {
+        throw new IllegalStateException("Utility class");
+    }
+
     /**
      * 初始化方法
      *
      * @param aspectPackageNames 需要扫描的切面编程包名集合：扫描{@link Aspect}注解的class类
      */
     public static void init(String... aspectPackageNames) {
+        //释放内存，减小的内存损耗
+        CtClass clazz = null;
         try {
             Set<String> classNameSet = new HashSet<>();
             //1. 包扫描，获取所有的class
@@ -42,7 +47,7 @@ public class DoAspect {
             }
             //2. 遍历所有的class，找出切面
             for (String className : classNameSet) {
-                CtClass clazz = Constants.POOL.getOrNull(className);
+                clazz = Constants.POOL.getOrNull(className);
                 if (Objects.isNull(clazz)) {
                     continue;
                 }
@@ -52,8 +57,12 @@ public class DoAspect {
                     String pointcutClassPath = aspect.pointcutAnnotationClassPath();
                     ANNOTATION_ASPECT_MAP.put(pointcutClassPath, new AspectInfo(aspect.order(), clazz));
                 }
+                clazz.detach();
             }
-        } catch (ClassNotFoundException e) {
+        } catch (Exception e) {
+            if (Objects.nonNull(clazz)) {
+                clazz.detach();
+            }
             Console.error(e, "DoAspect 初始化异常！");
         }
     }
@@ -64,6 +73,8 @@ public class DoAspect {
      * @param pointcutPackageNames 需要扫描的切面点包名集合：扫描切点类，即标注自定义注解的类（使用AOP的class）
      */
     public static void compileClass(String... pointcutPackageNames) {
+        //释放内存，减小的内存损耗
+        CtClass clazz = null;
         try {
             Set<String> classNameSet = new HashSet<>();
             //1. 包扫描，获取所有的class
@@ -74,7 +85,7 @@ public class DoAspect {
             for (String className : classNameSet) {
                 //判断是否重新加载字节码对象（为了解决重复加载class的问题）
                 boolean isLoadClass = false;
-                CtClass clazz = Constants.POOL.getOrNull(className);
+                clazz = Constants.POOL.getOrNull(className);
                 if (Objects.isNull(clazz)) {
                     continue;
                 }
@@ -87,10 +98,13 @@ public class DoAspect {
                 if (isLoadClass) {
                     clazz.toClass();
                     //clazz.writeFile("E:\\JavaMainTest\\target\\classes\\");
-                    clazz.detach();
                 }
+                clazz.detach();
             }
         } catch (Exception e) {
+            if (Objects.nonNull(clazz)) {
+                clazz.detach();
+            }
             Console.error(e, "DoAspect 字节码编程class异常！");
         }
     }
@@ -134,115 +148,204 @@ public class DoAspect {
      * @throws CannotCompileException 异常
      * @throws NotFoundException      异常
      */
-    private static void codeByAnnotation(CtClass clazz, CtMethod method, List<AspectInfo> sortedMethodAspectList) throws CannotCompileException, NotFoundException {
+    private static void codeByAnnotation(CtClass clazz, CtMethod method, List<AspectInfo> sortedMethodAspectList) throws CannotCompileException, NotFoundException, ClassNotFoundException {
         //切面注解不为空，判断方法是不是static方法
         boolean methodIsStatic = Modifier.isStatic(method.getModifiers());
         //1. 开始编辑字节码，实现切面编程
         for (AspectInfo methodAspectInfo : sortedMethodAspectList) {
             //2. 获取切面
             CtClass aspectClass = methodAspectInfo.getAspectClass();
-            //3. 获取切面的所有方法，并遍历切面的所有方法，找出对应的切面编程
-            CtMethod[] aspectMethods = aspectClass.getDeclaredMethods();
-            for (CtMethod aspectMethod : aspectMethods) {
-                //前置通知
-                aspectBefore(method, aspectClass, aspectMethod);
-                //返回通知
-                aspectAfterReturning(method, aspectClass, aspectMethod);
-                //后置通知
-                aspectAfter(method, aspectClass, aspectMethod);
-                //异常通知
-                aspectAfterThrowing(method, aspectClass, aspectMethod);
-                //环绕通知
-                aspectAround(clazz, method, methodIsStatic, aspectClass, aspectMethod);
-            }
-
+            //3. 获取切面编程方法
+            Map<Class<?>, CtMethod> methodMap = makeAspectOrder(aspectClass);
+            //创建前置局部变量
+            createLocalVariables(method);
+            //前置通知
+            aspectBefore(method, aspectClass, methodMap);
+            //返回通知
+            aspectAfterReturning(method, aspectClass, methodMap);
+            //异常通知
+            aspectAfterThrowing(method, aspectClass, methodMap);
+            //后置通知
+            aspectAfter(method, aspectClass, methodMap);
+            //环绕通知
+            aspectAround(clazz, method, methodIsStatic, aspectClass, methodMap);
         }
+    }
+
+    /**
+     * 获取切面编程方法
+     *
+     * @param aspectClass 切面class类
+     * @return 切面编程方法
+     * @throws ClassNotFoundException 异常
+     */
+    private static Map<Class<?>, CtMethod> makeAspectOrder(CtClass aspectClass) throws ClassNotFoundException {
+        //1. 获取切面的所有方法，并遍历切面的所有方法，找出对应的切面编程
+        CtMethod[] aspectMethods = aspectClass.getDeclaredMethods();
+        //2. 按照顺序执行切面
+        Map<Class<?>, CtMethod> methodMap = new HashMap<>(5);
+        for (CtMethod aspectMethod : aspectMethods) {
+            //前置通知
+            Object before = aspectMethod.getAnnotation(Before.class);
+            if (Objects.nonNull(before)) {
+                methodMap.put(Before.class, aspectMethod);
+            }
+            //返回通知
+            Object afterReturning = aspectMethod.getAnnotation(AfterReturning.class);
+            if (Objects.nonNull(afterReturning)) {
+                methodMap.put(AfterReturning.class, aspectMethod);
+            }
+            //后置通知
+            Object after = aspectMethod.getAnnotation(After.class);
+            if (Objects.nonNull(after)) {
+                methodMap.put(After.class, aspectMethod);
+            }
+            //异常通知
+            Object afterThrowing = aspectMethod.getAnnotation(AfterThrowing.class);
+            if (Objects.nonNull(afterThrowing)) {
+                methodMap.put(AfterThrowing.class, aspectMethod);
+            }
+            //环绕通知
+            Object around = aspectMethod.getAnnotation(Around.class);
+            if (Objects.nonNull(around)) {
+                methodMap.put(Around.class, aspectMethod);
+            }
+        }
+        return methodMap;
+    }
+
+    /**
+     * 创建局部变量
+     *
+     * @param method 切点方法
+     */
+    private static void createLocalVariables(CtMethod method) throws CannotCompileException {
+        CtClass paramPoint = null, paramAspectClazz = null;
+        try {
+            paramPoint = Constants.POOL.getOrNull("club.emperorws.aop.entity.Pointcut");
+            method.addLocalVariable("point", paramPoint);
+            paramAspectClazz = Constants.POOL.getOrNull("java.lang.Object");
+            method.addLocalVariable("aspectObj", paramAspectClazz);
+        } finally {
+            if (Objects.nonNull(paramPoint)) {
+                paramPoint.detach();
+            }
+            if (Objects.nonNull(paramAspectClazz)) {
+                paramAspectClazz.detach();
+            }
+        }
+    }
+
+    /**
+     * 为之前创建的局部变量赋值
+     *
+     * @param method      切点方法
+     * @param aspectClass 切面方法
+     */
+    private static void assignLocalVariables(CtMethod method, CtClass aspectClass) throws CannotCompileException {
+        String paramCode = "" +
+                "java.lang.reflect.Method method = $class.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
+                "point = new club.emperorws.aop.entity.Pointcut(method,$args);" +
+                "aspectObj = Class.forName(\"" + aspectClass.getName() + "\").newInstance();";
+        method.insertBefore(paramCode);
     }
 
     /**
      * 前置通知字节码增强
      *
-     * @param method       方法
-     * @param aspectClass  切面class
-     * @param aspectMethod {@link Before}标注的方法
+     * @param method      方法
+     * @param aspectClass 切面class
+     * @param methodMap   用于获取{@link Before}标注的方法
      * @throws CannotCompileException 异常
      */
-    private static void aspectBefore(CtMethod method, CtClass aspectClass, CtMethod aspectMethod) throws CannotCompileException {
-        if (aspectMethod.hasAnnotation(Before.class)) {
-            String beforeCode = "" +
-                    "Class clazz = $class;" +
-                    "java.lang.reflect.Method method = clazz.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
-                    "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(null,method,$args);" +
-                    "Object aspectClass = Class.forName(\"" + aspectClass.getName() + "\").newInstance();" +
-                    "java.lang.reflect.Method beforeMethod = aspectClass.getClass().getDeclaredMethod(\"" + aspectMethod.getName() + "\", new Class[]{club.emperorws.aop.entity.Pointcut.class});" +
-                    "beforeMethod.invoke(aspectClass, new Object[]{point});";
-            method.insertBefore(beforeCode);
+    private static void aspectBefore(CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException {
+        CtMethod aspectMethod = methodMap.get(Before.class);
+        if (Objects.isNull(aspectMethod)) {
+            //前置局部变量赋值
+            assignLocalVariables(method, aspectClass);
+            return;
         }
+        String beforeCode = "" +
+                "java.lang.reflect.Method method = $class.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
+                "point = new club.emperorws.aop.entity.Pointcut(method,$args);" +
+                "aspectObj = Class.forName(\"" + aspectClass.getName() + "\").newInstance();" +
+                "java.lang.reflect.Method beforeMethod = aspectObj.getClass().getDeclaredMethod(\"" + aspectMethod.getName() + "\", new Class[]{club.emperorws.aop.entity.Pointcut.class});" +
+                "beforeMethod.invoke(aspectObj, new Object[]{point});";
+        method.insertBefore(beforeCode);
     }
 
     /**
      * 返回通知字节码增强
      *
-     * @param method       方法
-     * @param aspectClass  切面class
-     * @param aspectMethod {@link AfterReturning}AfterReturning标注的方法
+     * @param method      方法
+     * @param aspectClass 切面class
+     * @param methodMap   用于获取{@link AfterReturning}AfterReturning标注的方法
      * @throws CannotCompileException 异常
      */
-    private static void aspectAfterReturning(CtMethod method, CtClass aspectClass, CtMethod aspectMethod) throws CannotCompileException {
-        if (aspectMethod.hasAnnotation(AfterReturning.class)) {
-            String afterReturningCode = "" +
-                    "Class clazz = $class;" +
-                    "java.lang.reflect.Method method = clazz.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
-                    "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(null,method,$args,$_);" +
-                    "Object aspectClass = Class.forName(\"" + aspectClass.getName() + "\").newInstance();" +
-                    "java.lang.reflect.Method afterReturningMethod = aspectClass.getClass().getDeclaredMethod(\"" + aspectMethod.getName() + "\", new Class[]{club.emperorws.aop.entity.Pointcut.class});" +
-                    "afterReturningMethod.invoke(aspectClass, new Object[]{point});";
-            method.insertAfter(afterReturningCode);
+    private static void aspectAfterReturning(CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException {
+        CtMethod aspectMethod = methodMap.get(AfterReturning.class);
+        if (Objects.isNull(aspectMethod)) {
+            return;
+        }
+        String afterReturningCode = "" +
+                "point.setReturnValue($_);" +
+                "java.lang.reflect.Method afterReturningMethod = aspectObj.getClass().getDeclaredMethod(\"" + aspectMethod.getName() + "\", new Class[]{club.emperorws.aop.entity.Pointcut.class});" +
+                "afterReturningMethod.invoke(aspectObj, new Object[]{point});";
+        method.insertAfter(afterReturningCode);
+    }
+
+    /**
+     * 异常通知字节码增强
+     *
+     * @param method      方法
+     * @param aspectClass 切面class
+     * @param methodMap   用于获取{@link AfterThrowing}AfterThrowing标注的方法
+     * @throws CannotCompileException 异常
+     * @throws NotFoundException      异常
+     */
+    private static void aspectAfterThrowing(CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException, NotFoundException {
+        CtMethod aspectMethod = methodMap.get(AfterThrowing.class);
+        if (Objects.isNull(aspectMethod)) {
+            return;
+        }
+        String exceptionCode = "" +
+                "java.lang.reflect.Method method = $class.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
+                "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(method,$args).setE($e);" +
+                "Object aspectClass = Class.forName(\"" + aspectClass.getName() + "\").newInstance();" +
+                "java.lang.reflect.Method exceptionMethod = aspectClass.getClass().getDeclaredMethod(\"" + aspectMethod.getName() + "\", new Class[]{club.emperorws.aop.entity.Pointcut.class});" +
+                "exceptionMethod.invoke(aspectClass, new Object[]{point});" +
+                "throw $e;";
+        CtClass exceptCtClass = null;
+        try {
+            exceptCtClass = Constants.POOL.get("java.lang.Exception");
+            method.addCatch(exceptionCode, exceptCtClass);
+        } finally {
+            if (Objects.nonNull(exceptCtClass)) {
+                exceptCtClass.detach();
+            }
         }
     }
 
     /**
      * 后置通知字节码增强
      *
-     * @param method       方法
-     * @param aspectClass  切面class
-     * @param aspectMethod {@link After}After标注的方法
+     * @param method      方法
+     * @param aspectClass 切面class
+     * @param methodMap   用于获取{@link After}After标注的方法
      * @throws CannotCompileException 异常
      */
-    private static void aspectAfter(CtMethod method, CtClass aspectClass, CtMethod aspectMethod) throws CannotCompileException {
-        if (aspectMethod.hasAnnotation(After.class)) {
-            String afterCode = "" +
-                    "Class clazz = $class;" +
-                    "java.lang.reflect.Method method = clazz.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
-                    "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(null,method,$args);" +
-                    "Object aspectClass = Class.forName(\"" + aspectClass.getName() + "\").newInstance();" +
-                    "java.lang.reflect.Method afterMethod = aspectClass.getClass().getDeclaredMethod(\"" + aspectMethod.getName() + "\", new Class[]{club.emperorws.aop.entity.Pointcut.class});" +
-                    "afterMethod.invoke(aspectClass, new Object[]{point});";
-            method.insertAfter(afterCode);
+    private static void aspectAfter(CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException {
+        CtMethod aspectMethod = methodMap.get(After.class);
+        if (Objects.isNull(aspectMethod)) {
+            return;
         }
-    }
-
-    /**
-     * 异常通知字节码增强
-     *
-     * @param method       方法
-     * @param aspectClass  切面class
-     * @param aspectMethod {@link AfterThrowing}AfterThrowing标注的方法
-     * @throws CannotCompileException 异常
-     * @throws NotFoundException      异常
-     */
-    private static void aspectAfterThrowing(CtMethod method, CtClass aspectClass, CtMethod aspectMethod) throws CannotCompileException, NotFoundException {
-        if (aspectMethod.hasAnnotation(AfterThrowing.class)) {
-            String exceptionCode = "" +
-                    "Class clazz = $class;" +
-                    "java.lang.reflect.Method method = clazz.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
-                    "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(null,method,$args,$e);" +
-                    "Object aspectClass = Class.forName(\"" + aspectClass.getName() + "\").newInstance();" +
-                    "java.lang.reflect.Method exceptionMethod = aspectClass.getClass().getDeclaredMethod(\"" + aspectMethod.getName() + "\", new Class[]{club.emperorws.aop.entity.Pointcut.class});" +
-                    "exceptionMethod.invoke(aspectClass, new Object[]{point});" +
-                    "throw $e;";
-            method.addCatch(exceptionCode, Constants.POOL.get("java.lang.Exception"));
-        }
+        String afterCode = "" +
+                "java.lang.reflect.Method method = $class.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
+                "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(method,$args);" +
+                "Object aspectClass = Class.forName(\"" + aspectClass.getName() + "\").newInstance();" +
+                "java.lang.reflect.Method afterMethod = aspectClass.getClass().getDeclaredMethod(\"" + aspectMethod.getName() + "\", new Class[]{club.emperorws.aop.entity.Pointcut.class});" +
+                "afterMethod.invoke(aspectClass, new Object[]{point});";
+        method.insertAfter(afterCode, true);
     }
 
     /**
@@ -256,32 +359,33 @@ public class DoAspect {
      * @throws NotFoundException      异常
      * @throws CannotCompileException 异常
      */
-    private static void aspectAround(CtClass clazz, CtMethod method, boolean methodIsStatic, CtClass aspectClass, CtMethod aspectMethod) throws NotFoundException, CannotCompileException {
-        if (aspectMethod.hasAnnotation(Around.class)) {
-            //先复制原方法，由于嵌套执行
-            //1. 复制方法
-            CtMethod srcMethod = CtNewMethod.copy(method, clazz, null);
-            //2. 给新的方法换一个名字
-            String srcMethodName = method.getName() + "_" + UUID.randomUUID().toString().replace("-", "");
-            srcMethod.setName(srcMethodName);
-            //3. 复制运行时可见注解
-            srcMethod.getMethodInfo().addAttribute(method.getMethodInfo().getAttribute(AnnotationsAttribute.visibleTag));
-            //4. 将这个方法添加到类里面
-            clazz.addMethod(srcMethod);
-            //5. 再嵌套设置新方法
-            StringBuilder aroundCode = new StringBuilder("{" +
-                    "Class clazz = $class;" +
-                    "java.lang.reflect.Method method = clazz.getDeclaredMethod(\"" + srcMethodName + "\",$sig);" +
-                    "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(" + (methodIsStatic ? "" : "$0,") + "method,$args);" +
-                    "Object aspectClass = Class.forName(\"" + aspectClass.getName() + "\").newInstance();" +
-                    "java.lang.reflect.Method beforeMethod = aspectClass.getClass().getDeclaredMethod(\"" + aspectMethod.getName() + "\", new Class[]{club.emperorws.aop.entity.Pointcut.class});" +
-                    "beforeMethod.invoke(aspectClass, new Object[]{point});");
-            //非void的方法，增加return返回值
-            if (!method.getReturnType().equals(CtClass.voidType)) {
-                aroundCode.append("return ($r)point.getReturnValue();");
-            }
-            aroundCode.append("}");
-            method.setBody(aroundCode.toString());
+    private static void aspectAround(CtClass clazz, CtMethod method, boolean methodIsStatic, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws NotFoundException, CannotCompileException {
+        CtMethod aspectMethod = methodMap.get(Around.class);
+        if (Objects.isNull(aspectMethod)) {
+            return;
         }
+        //先复制原方法，由于嵌套执行
+        //1. 复制方法
+        CtMethod srcMethod = CtNewMethod.copy(method, clazz, null);
+        //2. 给新的方法换一个名字
+        String srcMethodName = method.getName() + "_" + UUID.randomUUID().toString().replace("-", "");
+        srcMethod.setName(srcMethodName);
+        //3. 复制运行时可见注解
+        srcMethod.getMethodInfo().addAttribute(method.getMethodInfo().getAttribute(AnnotationsAttribute.visibleTag));
+        //4. 将这个方法添加到类里面
+        clazz.addMethod(srcMethod);
+        //5. 再嵌套设置新方法
+        StringBuilder aroundCode = new StringBuilder("{" +
+                "java.lang.reflect.Method method = $class.getDeclaredMethod(\"" + srcMethodName + "\",$sig);" +
+                "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(method,$args).setThisProceedObj(" + (methodIsStatic ? "null" : "$0") + ");" +
+                "Object aspectClass = Class.forName(\"" + aspectClass.getName() + "\").newInstance();" +
+                "java.lang.reflect.Method beforeMethod = aspectClass.getClass().getDeclaredMethod(\"" + aspectMethod.getName() + "\", new Class[]{club.emperorws.aop.entity.Pointcut.class});" +
+                "beforeMethod.invoke(aspectClass, new Object[]{point});");
+        //非void的方法，增加return返回值
+        if (!method.getReturnType().equals(CtClass.voidType)) {
+            aroundCode.append("return ($r)point.getReturnValue();");
+        }
+        aroundCode.append("}");
+        method.setBody(aroundCode.toString());
     }
 }
