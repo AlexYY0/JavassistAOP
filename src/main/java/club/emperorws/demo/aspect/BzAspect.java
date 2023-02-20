@@ -14,35 +14,30 @@ import cn.hutool.core.lang.Console;
 @Aspect(order = 0, pointcutAnnotationClassPath = "club.emperorws.demo.aspect.annotation.CatchException")
 public class BzAspect {
 
-    @Before
-    public void before(Pointcut pointcut) {
-        Console.log("before");
-        Console.log(pointcut);
-    }
-
     @AfterThrowing
     public void afterThrowing(Pointcut pointcut) {
-        Console.log("afterThrowing");
-        Console.log(pointcut);
+        Console.log("afterThrowing1:{}", pointcut);
     }
 
     @After
     public void after(Pointcut pointcut) {
-        Console.log("after");
-        Console.log(pointcut);
-    }
-
-    @AfterReturning
-    public void afterReturning(Pointcut pointcut) {
-        Console.log("afterReturning");
-        Console.log(pointcut);
+        Console.log("after1:{}", pointcut);
     }
 
     @Around
     public void around(Pointcut pointcut) throws Throwable {
-        Console.log("around");
+        Console.log("around1-start:{}", pointcut);
         Object result = pointcut.proceed();
-        Console.log(pointcut);
-        Console.log("result:{}", result);
+        Console.log("around1-end:{}", result);
+    }
+
+    @AfterReturning
+    public void afterReturning(Pointcut pointcut) {
+        Console.log("afterReturning1:{}", pointcut);
+    }
+
+    @Before
+    public void before(Pointcut pointcut) {
+        Console.log("before1:{}", pointcut);
     }
 }

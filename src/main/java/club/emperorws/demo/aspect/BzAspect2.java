@@ -16,33 +16,28 @@ public class BzAspect2 {
 
     @Before
     public void before(Pointcut pointcut) {
-        Console.log("before2");
-        Console.log(pointcut);
+        Console.log("before2:{}", pointcut);
     }
 
     @AfterReturning
     public void afterReturning(Pointcut pointcut) {
-        Console.log("afterReturning2");
-        Console.log(pointcut);
+        Console.log("afterReturning2:{}", pointcut);
     }
 
     @AfterThrowing
     public void afterThrowing(Pointcut pointcut) {
-        Console.log("afterThrowing2");
-        Console.log(pointcut);
+        Console.log("afterThrowing2:{}", pointcut);
     }
 
     @After
     public void after(Pointcut pointcut) {
-        Console.log("after2");
-        Console.log(pointcut);
+        Console.log("after2:{}", pointcut);
     }
 
     @Around
     public void around(Pointcut pointcut) throws Throwable {
-        Console.log("around2");
+        Console.log("around2-start:{}", pointcut);
         Object result = pointcut.proceed();
-        Console.log(pointcut);
-        Console.log("result2:{}", result);
+        Console.log("around2-end:{}", result);
     }
 }

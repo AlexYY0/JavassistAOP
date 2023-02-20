@@ -10,6 +10,7 @@ import javassist.CtNewMethod;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -27,8 +28,12 @@ public class Main {
         //AOP字节码增强
         DoAspect.compileClass("club.emperorws.demo");
         //开始使用
-        BusinessController bz = new BusinessController();
-        bz.doSth("aa", 2);
+        //BusinessController bz = new BusinessController();
+        //bz.doSth("aa", 2);
+        Object bzObj = Class.forName("club.emperorws.demo.BusinessController").newInstance();
+        Method doSthMethod = bzObj.getClass().getDeclaredMethod("doSth", String.class, Integer.class);
+        Object aa = doSthMethod.invoke(bzObj, "aa", 2);
+        System.out.println("invoke result:" + aa);
     }
 
     private void demoTest() throws Exception {
