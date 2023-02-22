@@ -1,5 +1,5 @@
 # JavassistAOP
-使用Javassist实现的AOP框架，通过改变字节码的方式实现切面编程，适用于普通Java项目。
+使用Javassist实现的AOP框架，通过修改字节码的方式实现切面编程，适用于普通Java项目。
 
 ##### 有五大注解：@Around、@Before、@AfterReturning、@AfterThrowing、@After（可以在Around或AfterReturning中获取切点的返回值）
 
@@ -7,4 +7,103 @@
 1. Around->Before->AfterReturning->After
 2. Around->Before->AfterThrowing->After
 
-> 注:尽量减少使用Around，使用Before+AfterReturning或Before+After替代Around，因为Around使用了反射，性能不佳，性能最佳的搭配是：Before+AfterReturning
+> 注:
+> 1. 可以在Around或AfterReturning中获取切点的返回值；
+> 2. 切面注解的执行顺序（优先级order），从0开始，数值越小，优先级越高；
+> 3. 执行切面的方法，方法参数有且只能有一个，为club.emperorws.aop.entity.Pointcut类型的参数.
+
+##### 代码示例
+
+###### 1. 切面注解
+```java
+package club.emperorws.demo.aspect.annotation;
+
+import java.lang.annotation.*;
+
+/**
+ * 捕获异常的注解
+ *
+ * @author: EmperorWS
+ * @date: 2023/2/17 0:51
+ * @description: CatchException: 捕获异常的注解
+ */
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+public @interface CatchException {
+}
+```
+
+###### 2. 切面方法
+```java
+package club.emperorws.demo.aspect;
+
+import club.emperorws.aop.annotation.*;
+import club.emperorws.aop.entity.Pointcut;
+import cn.hutool.core.lang.Console;
+
+/**
+ * 业务切面编程
+ *
+ * @author: EmperorWS
+ * @date: 2023/2/17 0:41
+ * @description: BzAspect: 业务切面编程
+ */
+@Aspect(order = 0, pointcutAnnotationClassPath = "club.emperorws.demo.aspect.annotation.CatchException")
+public class BzAspect {
+
+    @AfterThrowing
+    public void afterThrowing(Pointcut pointcut) {
+        Console.log("afterThrowing1:{}", pointcut);
+    }
+
+    @After
+    public void after(Pointcut pointcut) {
+        Console.log("after1:{}", pointcut);
+    }
+
+    @Around
+    public void around(Pointcut pointcut) throws Throwable {
+        Console.log("around1-start:{}", pointcut);
+        Object result = pointcut.proceed();
+        Console.log("around1-end:{}", result);
+    }
+
+    @AfterReturning
+    public void afterReturning(Pointcut pointcut) {
+        Console.log("afterReturning1:{}", pointcut);
+    }
+
+    @Before
+    public void before(Pointcut pointcut) {
+        Console.log("before1:{}", pointcut);
+    }
+}
+```
+###### 3. 使用切面注解
+```java
+package club.emperorws.demo;
+
+import club.emperorws.demo.aspect.annotation.CatchException;
+import club.emperorws.entity.R;
+
+/**
+ * 业务方法接口
+ *
+ * @author: EmperorWS
+ * @date: 2023/2/17 0:29
+ * @description: BusinessController: 业务方法接口
+ */
+public class BusinessController {
+
+    @CatchException
+    public R doSth(String aa,Integer bb) throws Exception {
+        System.out.println("Start do sth");
+        int a = 0, b = 1, c = 2;
+        int r = a + b * c;
+        //int e = 1 / 0;
+        System.out.println("End do sth");
+        return new R("0", r);
+    }
+}
+```

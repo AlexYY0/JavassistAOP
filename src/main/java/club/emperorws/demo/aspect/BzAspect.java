@@ -27,8 +27,8 @@ public class BzAspect {
     @Around
     public void around(Pointcut pointcut) throws Throwable {
         Console.log("around1-start:{}", pointcut);
-        Object result = pointcut.proceed();
-        Console.log("around1-end:{}", result);
+        pointcut.proceed();
+        Console.log("around1-end:{}", pointcut.getReturnValue());
     }
 
     @AfterReturning

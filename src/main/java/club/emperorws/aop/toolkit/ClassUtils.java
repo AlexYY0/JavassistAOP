@@ -25,6 +25,10 @@ import java.util.jar.JarFile;
  */
 public class ClassUtils {
 
+    private ClassUtils() {
+        throw new IllegalStateException("Utility ClassUtils class can not use constructor.");
+    }
+
     /**
      * 从包package中获取所有的Class
      *
