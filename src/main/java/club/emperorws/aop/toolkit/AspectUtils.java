@@ -7,7 +7,6 @@ import javassist.bytecode.AnnotationsAttribute;
 import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 
-import java.io.IOException;
 import java.util.*;
 
 /**
@@ -26,22 +25,25 @@ public class AspectUtils {
     /**
      * 复制方法并添加复制的方法到原class中
      *
-     * @param clazz  复制方法的原class，复制后的方法也添加到该class
-     * @param method 被复制的方法
-     * @return 复制后的方法名
+     * @param clazz            复制方法的原class，复制后的方法也添加到该class
+     * @param method           被复制的方法
+     * @param newMethodName    复制后的方法名称
+     * @param isCopyAnnotation 是否复制方法的注解
+     * @return 复制的方法
      * @throws CannotCompileException 异常
      */
-    public static String copyAndAddMethod(CtClass clazz, CtMethod method) throws CannotCompileException {
+    public static CtMethod copyAndAddMethod(CtClass clazz, CtMethod method, String newMethodName, boolean isCopyAnnotation) throws CannotCompileException {
         //1. 复制方法
         CtMethod srcMethod = CtNewMethod.copy(method, clazz, null);
         //2. 给新的方法换一个名字
-        String srcMethodName = method.getName() + "_" + UUID.randomUUID().toString().replace("-", "");
-        srcMethod.setName(srcMethodName);
+        srcMethod.setName(newMethodName);
         //3. 复制运行时可见注解
-        srcMethod.getMethodInfo().addAttribute(method.getMethodInfo().getAttribute(AnnotationsAttribute.visibleTag));
+        if (isCopyAnnotation) {
+            srcMethod.getMethodInfo().addAttribute(method.getMethodInfo().getAttribute(AnnotationsAttribute.visibleTag));
+        }
         //4. 将这个方法添加到类里面
         clazz.addMethod(srcMethod);
-        return srcMethodName;
+        return srcMethod;
     }
 
     /**
@@ -89,22 +91,16 @@ public class AspectUtils {
     /**
      * 创建局部变量
      *
-     * @param aspectClass 切面class
      * @param method      切点方法
      */
-    public static void createLocalVariables(CtClass aspectClass, CtMethod method) throws CannotCompileException {
-        CtClass paramPoint = null, paramAspectClazz = null;
+    public static void createLocalVariables(CtMethod method) throws CannotCompileException {
+        CtClass paramPoint = null;
         try {
             paramPoint = Constants.POOL.getOrNull("club.emperorws.aop.entity.Pointcut");
             method.addLocalVariable("point", paramPoint);
-            paramAspectClazz = Constants.POOL.getOrNull(aspectClass.getName());
-            method.addLocalVariable("aspectObj", paramAspectClazz);
         } finally {
             if (Objects.nonNull(paramPoint)) {
                 paramPoint.detach();
-            }
-            if (Objects.nonNull(paramAspectClazz)) {
-                paramAspectClazz.detach();
             }
         }
     }
@@ -112,78 +108,92 @@ public class AspectUtils {
     /**
      * 为之前创建的局部变量赋值
      *
-     * @param method      切点方法
-     * @param aspectClass 切面方法
+     * @param method 切点方法
      */
-    public static void assignLocalVariables(CtMethod method, CtClass aspectClass) throws CannotCompileException {
+    public static void assignLocalVariables(CtMethod method) throws CannotCompileException {
         String paramCode = "" +
                 "java.lang.reflect.Method method = $class.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
-                "point = new club.emperorws.aop.entity.Pointcut(method,$args);" +
-                "aspectObj = new " + aspectClass.getName() + "();";
+                "point = new club.emperorws.aop.entity.Pointcut(method,$args);";
         method.insertBefore(paramCode);
     }
 
     /**
      * 前置通知字节码增强
      *
+     * @param clazz       切点类
      * @param method      方法
      * @param aspectClass 切面class
      * @param methodMap   用于获取{@link Before}标注的方法
      * @throws CannotCompileException 异常
      */
-    public static void aspectBefore(CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException {
+    public static void aspectBefore(CtClass clazz, CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException {
         CtMethod aspectMethod = methodMap.get(Before.class);
         if (Objects.isNull(aspectMethod)) {
             //前置局部变量赋值
-            assignLocalVariables(method, aspectClass);
+            assignLocalVariables(method);
             return;
         }
+        //1. 复制切面方法到切点Class
+        String srcAspectMethodName = method.getName() + "_" + aspectClass.getSimpleName() + "$" + aspectMethod.getName();
+        copyAndAddMethod(clazz, aspectMethod, srcAspectMethodName, false);
+        //2. 插入方法
         String beforeCode = "" +
                 "java.lang.reflect.Method method = $class.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
                 "point = new club.emperorws.aop.entity.Pointcut(method,$args);" +
-                "aspectObj = new " + aspectClass.getName() + "();" +
-                "aspectObj." + aspectMethod.getName() + "(point);";
+                srcAspectMethodName + "(point);";
         method.insertBefore(beforeCode);
     }
 
     /**
      * 返回通知字节码增强
      *
+     * @param clazz       切点类
      * @param method      方法
      * @param aspectClass 切面class
      * @param methodMap   用于获取{@link AfterReturning}AfterReturning标注的方法
      * @throws CannotCompileException 异常
      */
-    public static void aspectAfterReturning(CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException {
+    public static void aspectAfterReturning(CtClass clazz, CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException {
         CtMethod aspectMethod = methodMap.get(AfterReturning.class);
         if (Objects.isNull(aspectMethod)) {
             return;
         }
+        //1. 复制切面方法到切点Class
+        String srcAspectMethodName = method.getName() + "_" + aspectClass.getSimpleName() + "$" + aspectMethod.getName();
+        copyAndAddMethod(clazz, aspectMethod, srcAspectMethodName, false);
+        //2. 插入方法
         String afterReturningCode = "" +
                 "point.setReturnValue($_);" +
-                "aspectObj." + aspectMethod.getName() + "(point);";
+                srcAspectMethodName + "(point);";
         method.insertAfter(afterReturningCode);
     }
 
     /**
      * 异常通知字节码增强
      *
+     * @param clazz       切点类
      * @param method      方法
      * @param aspectClass 切面class
      * @param methodMap   用于获取{@link AfterThrowing}AfterThrowing标注的方法
      * @throws CannotCompileException 异常
      * @throws NotFoundException      异常
      */
-    public static void aspectAfterThrowing(CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException, NotFoundException {
+    public static void aspectAfterThrowing(CtClass clazz, CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException, NotFoundException {
         CtMethod aspectMethod = methodMap.get(AfterThrowing.class);
         if (Objects.isNull(aspectMethod)) {
             return;
         }
+        //1. 复制切面方法到切点Class
+        String srcAspectMethodName = method.getName() + "_" + aspectClass.getSimpleName() + "$" + aspectMethod.getName();
+        copyAndAddMethod(clazz, aspectMethod, srcAspectMethodName, false);
+        //2. 插入方法
         String exceptionCode = "" +
                 "java.lang.reflect.Method method = $class.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
                 "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(method,$args).setE($e);" +
-                aspectClass.getName() + " aspectObj = new " + aspectClass.getName() + "();" +
-                "aspectObj." + aspectMethod.getName() + "(point);" +
+                srcAspectMethodName + "(point);" +
+                "if(point.getReturnValue() != null){" +
+                "return (" + method.getReturnType().getName() + ")point.getReturnValue();" +
+                "}" +
                 "throw $e;";
         CtClass exceptCtClass = null;
         try {
@@ -199,72 +209,75 @@ public class AspectUtils {
     /**
      * 后置通知字节码增强
      *
+     * @param clazz       切点类
      * @param method      方法
      * @param aspectClass 切面class
      * @param methodMap   用于获取{@link After}After标注的方法
      * @throws CannotCompileException 异常
      */
-    public static void aspectAfter(CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException {
+    public static void aspectAfter(CtClass clazz, CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws CannotCompileException {
         CtMethod aspectMethod = methodMap.get(After.class);
         if (Objects.isNull(aspectMethod)) {
             return;
         }
+        //1. 复制切面方法到切点Class
+        String srcAspectMethodName = method.getName() + "_" + aspectClass.getSimpleName() + "$" + aspectMethod.getName();
+        copyAndAddMethod(clazz, aspectMethod, srcAspectMethodName, false);
+        //2. 插入方法
         String afterCode = "" +
                 "java.lang.reflect.Method method = $class.getDeclaredMethod(\"" + method.getName() + "\",$sig);" +
                 "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(method,$args);" +
-                aspectClass.getName() + " aspectObj = new " + aspectClass.getName() + "();" +
-                "aspectObj." + aspectMethod.getName() + "(point);";
+                srcAspectMethodName + "(point);";
         method.insertAfter(afterCode, true);
     }
 
     /**
      * 环绕通知字节码增强
      *
-     * @param clazz          切点类
-     * @param method         切点方法
-     * @param methodIsStatic 方法是否是静态方法
-     * @param aspectClass    切面class
-     * @param methodMap      用于获取{@link Around}Around标志的方法
+     * @param clazz       切点类
+     * @param method      切点方法
+     * @param aspectClass 切面class
+     * @param methodMap   用于获取{@link Around}Around标志的方法
      * @throws NotFoundException      异常
      * @throws CannotCompileException 异常
      */
-    public static void aspectAround(CtClass clazz, CtMethod method, boolean methodIsStatic, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws NotFoundException, CannotCompileException {
+    public static void aspectAround(CtClass clazz, CtMethod method, CtClass aspectClass, Map<Class<?>, CtMethod> methodMap) throws NotFoundException, CannotCompileException {
         CtMethod aspectMethod = methodMap.get(Around.class);
         if (Objects.isNull(aspectMethod)) {
             return;
         }
-        //1. 先复制原方法，由于嵌套执行
-        String srcMethodName = copyAndAddMethod(clazz, method);
-        //2. 再嵌套设置新方法
+        //1. 获取原方法的请求参数类型，方便后续的处理
+        CtClass[] parameterTypes = method.getParameterTypes();
+        StringJoiner parameterTypeSj = new StringJoiner(",", "(", ");");
+        for (int i = 0; i < parameterTypes.length; i++) {
+            parameterTypeSj.add("(" + parameterTypes[i].getName() + ")$0.getArgs()[" + i + "]");
+        }
+        //2. 先复制原方法，由于嵌套执行
+        String srcMethodName = method.getName() + "_" + UUID.randomUUID().toString().replace("-", "");
+        copyAndAddMethod(clazz, method, srcMethodName, true);
+        //3. 复制切面方法到切点Class
+        String srcAspectMethodName = method.getName() + "_" + aspectClass.getSimpleName() + "$" + aspectMethod.getName();
+        CtMethod srcAspectMethod = copyAndAddMethod(clazz, aspectMethod, srcAspectMethodName, false);
+        //4. 修改aspect切面@Around方法里的pointcut.proceed()为真正的切点方法
+        srcAspectMethod.instrument(new ExprEditor() {
+            @Override
+            public void edit(MethodCall m) throws CannotCompileException {
+                if (m.getClassName().equals("club.emperorws.aop.entity.Pointcut") && m.getMethodName().equals("proceed")) {
+                    m.replace("$_ = " + srcMethodName + parameterTypeSj +
+                            "$0.setReturnValue($_);");
+                }
+            }
+        });
+        //4. 再修改原切点方法体
         StringBuilder aroundCode = new StringBuilder("{" +
                 "java.lang.reflect.Method method = $class.getDeclaredMethod(\"" + srcMethodName + "\",$sig);" +
-                "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(method,$args).setThisProceedObj(" + (methodIsStatic ? "null" : "$0") + ");" +
-                aspectClass.getName() + " aspectObj = new " + aspectClass.getName() + "();" +
-                "aspectObj." + aspectMethod.getName() + "(point);");
+                "club.emperorws.aop.entity.Pointcut point = new club.emperorws.aop.entity.Pointcut(method,$args);" +
+                srcAspectMethodName + "(point);");
         //非void的方法，增加return返回值
         if (!method.getReturnType().equals(CtClass.voidType)) {
             aroundCode.append("return ($r)point.getReturnValue();");
         }
         aroundCode.append("}");
         method.setBody(aroundCode.toString());
-        //3. 修改aspect切面的@Around方法
-        //获取原方法的请求参数类型，方便后续的处理
-        CtClass[] parameterTypes = method.getParameterTypes();
-        StringJoiner parameterTypeSj = new StringJoiner(",", "(", ");");
-        for (int i = 0; i < parameterTypes.length; i++) {
-            parameterTypeSj.add("(" + parameterTypes[i].getName() + ")$0.getArgs()[" + i + "]");
-        }
-        //4. 修改aspect切面@Around方法里的pointcut.proceed()为真正的切点方法
-        aspectMethod.instrument(new ExprEditor(){
-            @Override
-            public void edit(MethodCall m) throws CannotCompileException {
-                if (m.getClassName().equals("club.emperorws.aop.entity.Pointcut") && m.getMethodName().equals("proceed")) {
-                    m.replace(clazz.getName() + " obj = (" + clazz.getName() + ")$0.getThisProceedObj();" +
-                            "$_ = obj." + srcMethodName + parameterTypeSj +
-                            "$0.setReturnValue($_);");
-                }
-            }
-        });
-        aspectClass.toClass();
     }
 }

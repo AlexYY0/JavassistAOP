@@ -5,7 +5,10 @@ import club.emperorws.aop.constant.Constants;
 import club.emperorws.aop.entity.AspectInfo;
 import club.emperorws.aop.toolkit.ClassUtils;
 import cn.hutool.core.lang.Console;
-import javassist.*;
+import javassist.CannotCompileException;
+import javassist.CtClass;
+import javassist.CtMethod;
+import javassist.NotFoundException;
 import javassist.bytecode.annotation.Annotation;
 
 import java.util.*;
@@ -93,12 +96,16 @@ public class DoAspect {
                 //遍历class的所有方法
                 CtMethod[] methods = clazz.getDeclaredMethods();
                 for (CtMethod method : methods) {
-                    isLoadClass = methodAspect(clazz, method);
+                    boolean flag = methodAspect(clazz, method);
+                    //避免重复definition Class而报错
+                    if (!isLoadClass) {
+                        isLoadClass = flag;
+                    }
                 }
                 //加载编好的class
                 if (isLoadClass) {
                     clazz.toClass();
-                    //clazz.writeFile("E:\\CodePractice\\StudyPractice\\JavaMainTest\\target\\classes\\");
+                    clazz.writeFile("E:\\CodePractice\\StudyPractice\\JavaMainTest\\target\\classes\\javassist\\");
                 }
                 clazz.detach();
             }
@@ -150,8 +157,6 @@ public class DoAspect {
      * @throws NotFoundException      异常
      */
     private static void codeByAnnotation(CtClass clazz, CtMethod method, List<AspectInfo> sortedMethodAspectList) throws CannotCompileException, NotFoundException, ClassNotFoundException {
-        //切面注解不为空，判断方法是不是static方法
-        boolean methodIsStatic = Modifier.isStatic(method.getModifiers());
         //1. 开始编辑字节码，实现切面编程
         for (AspectInfo methodAspectInfo : sortedMethodAspectList) {
             //2. 获取切面
@@ -159,17 +164,17 @@ public class DoAspect {
             //3. 获取切面编程方法
             Map<Class<?>, CtMethod> methodMap = makeAspectOrder(aspectClass);
             //创建前置局部变量
-            createLocalVariables(aspectClass, method);
+            createLocalVariables(method);
             //前置通知
-            aspectBefore(method, aspectClass, methodMap);
+            aspectBefore(clazz, method, aspectClass, methodMap);
             //返回通知
-            aspectAfterReturning(method, aspectClass, methodMap);
+            aspectAfterReturning(clazz, method, aspectClass, methodMap);
             //异常通知
-            aspectAfterThrowing(method, aspectClass, methodMap);
+            aspectAfterThrowing(clazz, method, aspectClass, methodMap);
             //后置通知
-            aspectAfter(method, aspectClass, methodMap);
+            aspectAfter(clazz, method, aspectClass, methodMap);
             //环绕通知
-            aspectAround(clazz, method, methodIsStatic, aspectClass, methodMap);
+            aspectAround(clazz, method, aspectClass, methodMap);
         }
     }
 }
