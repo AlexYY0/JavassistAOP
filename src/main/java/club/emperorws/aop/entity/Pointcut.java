@@ -1,6 +1,7 @@
 package club.emperorws.aop.entity;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 
 /**
@@ -91,19 +92,19 @@ public class Pointcut {
     }
 
     /**
-     * 标志方法，标志着执行切点方法，实际没有什么用
+     * 反射执行切点方法
+     * {@link club.emperorws.aop.annotation.Around}注解的方法里使用，不要在其它地方使用，否则有死循环的风险
      *
      * @return 切点方法的返回结果
      * @throws Throwable 异常
      */
     public Object proceed() throws Throwable {
-        System.out.println("执行了proceed()");
         //如果是静态方法
-        /*if (Modifier.isStatic(method.getModifiers())) {
+        if (Modifier.isStatic(method.getModifiers())) {
             this.returnValue = method.invoke(null, args);
         } else {
             this.returnValue = method.invoke(thisProceedObj, args);
-        }*/
+        }
         return returnValue;
     }
 

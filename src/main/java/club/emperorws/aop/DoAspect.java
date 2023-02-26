@@ -5,10 +5,7 @@ import club.emperorws.aop.constant.Constants;
 import club.emperorws.aop.entity.AspectInfo;
 import club.emperorws.aop.toolkit.ClassUtils;
 import cn.hutool.core.lang.Console;
-import javassist.CannotCompileException;
-import javassist.CtClass;
-import javassist.CtMethod;
-import javassist.NotFoundException;
+import javassist.*;
 import javassist.bytecode.annotation.Annotation;
 
 import java.util.*;
@@ -157,6 +154,8 @@ public class DoAspect {
      * @throws NotFoundException      异常
      */
     private static void codeByAnnotation(CtClass clazz, CtMethod method, List<AspectInfo> sortedMethodAspectList) throws CannotCompileException, NotFoundException, ClassNotFoundException {
+        //切面注解不为空，判断方法是不是static方法
+        boolean methodIsStatic = Modifier.isStatic(method.getModifiers());
         //1. 开始编辑字节码，实现切面编程
         for (AspectInfo methodAspectInfo : sortedMethodAspectList) {
             //2. 获取切面
@@ -164,17 +163,17 @@ public class DoAspect {
             //3. 获取切面编程方法
             Map<Class<?>, CtMethod> methodMap = makeAspectOrder(aspectClass);
             //创建前置局部变量
-            createLocalVariables(method);
+            createLocalVariables(aspectClass, method);
             //前置通知
-            aspectBefore(clazz, method, aspectClass, methodMap);
+            aspectBefore(method, aspectClass, methodMap);
             //返回通知
-            aspectAfterReturning(clazz, method, aspectClass, methodMap);
+            aspectAfterReturning(method, aspectClass, methodMap);
             //异常通知
-            aspectAfterThrowing(clazz, method, aspectClass, methodMap);
+            aspectAfterThrowing(method, aspectClass, methodMap);
             //后置通知
-            aspectAfter(clazz, method, aspectClass, methodMap);
+            aspectAfter(method, aspectClass, methodMap);
             //环绕通知
-            aspectAround(clazz, method, aspectClass, methodMap);
+            aspectAround(clazz, method, methodIsStatic, aspectClass, methodMap);
         }
     }
 }
