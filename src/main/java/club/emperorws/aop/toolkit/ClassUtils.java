@@ -128,7 +128,7 @@ public class ClassUtils {
             }
             //如果是一个.class文件 而且不是目录
             // 去掉后面的".class" 获取真正的类名
-            className = pkgName + "." + name.substring(0, name.length() - 6);
+            className = name.substring(0, name.length() - 6).replace("/", ".");
             //添加类
             classNameSet.add(className);
         }
