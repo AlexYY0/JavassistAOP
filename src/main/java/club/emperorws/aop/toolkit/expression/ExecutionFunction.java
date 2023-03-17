@@ -1,6 +1,7 @@
 package club.emperorws.aop.toolkit.expression;
 
 import club.emperorws.aop.constant.Constants;
+import club.emperorws.aop.toolkit.StringUtils;
 import com.googlecode.aviator.runtime.function.AbstractFunction;
 import com.googlecode.aviator.runtime.type.AviatorBoolean;
 import com.googlecode.aviator.runtime.type.AviatorObject;
@@ -33,13 +34,13 @@ public class ExecutionFunction extends AbstractFunction {
      *
      * @param env  请求参数，环境变量
      * @param arg1 实际的请求参数
-     * @return 自定义方法execution("")执行的返回结果
+     * @return 自定义方法execution(" ")执行的返回结果
      */
     @Override
     public AviatorObject call(Map<String, Object> env, AviatorObject arg1) {
         //表达式，效果等同于FunctionUtils.getStringValue(arg1,env)
         //正则表达式转义
-        String expr = arg1.stringValue(env).replaceAll("\\.", "\\\\.").replaceAll("\\*", ".*");
+        String expr = StringUtils.escapeRegex(arg1.stringValue(env));
         //获取校验参戴
         String methodSignature = env.getOrDefault(Constants.METHOD_SIGNATURE, "").toString();
         Pattern pattern = Pattern.compile(expr);

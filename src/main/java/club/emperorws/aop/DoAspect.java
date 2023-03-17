@@ -141,7 +141,7 @@ public class DoAspect {
             for (Map.Entry<String, AspectInfo> entry : ANNOTATION_ASPECT_MAP.entrySet()) {
                 String pointcut = entry.getKey();
                 //规则匹配，是切点
-                if (ExprUtils.<Boolean>executeExpression(pointcut, context)) {
+                if (Boolean.TRUE.equals(ExprUtils.<Boolean>executeExpression(pointcut, context))) {
                     methodAspectList.add(entry.getValue());
                 }
             }

@@ -7,6 +7,7 @@ import club.emperorws.demo.aspect.annotation.CatchException;
 import club.emperorws.demo.controller.BusinessController2;
 import javassist.*;
 
+import java.util.Arrays;
 import java.util.Set;
 
 /**
@@ -23,8 +24,9 @@ public class Main {
         //开始使用
         BusinessController bz = new BusinessController();
         bz.doSth("aa", 1);
-        /*BusinessController2 bz2 = new BusinessController2();
-        bz2.doSth("aa", 2);*/
+        System.out.println("===========================================================================================");
+        BusinessController2 bz2 = new BusinessController2();
+        bz2.doSth("aa", 2);
         //demoTest();
     }
 
