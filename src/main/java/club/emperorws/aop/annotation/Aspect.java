@@ -24,9 +24,10 @@ public @interface Aspect {
     int order();
 
     /**
-     * 切面注解的class包路径
+     * 切面的使用范围：切点表达式
+     * 支持execution(正则匹配)和@annotation(全词匹配)
      *
-     * @return 切面注解的class包路径
+     * @return 切点表达式
      */
-    String pointcutAnnotationClassPath();
+    String pointcut();
 }

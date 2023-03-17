@@ -10,7 +10,9 @@
 > 注:
 > 1. 可以在Around或AfterReturning中获取切点的返回值；
 > 2. 切面注解的执行顺序（优先级order），从0开始，数值越小，优先级越高；
-> 3. 执行切面的方法，方法参数有且只能有一个，为club.emperorws.aop.entity.Pointcut类型的参数.
+> 3. 执行切面的方法，方法参数有且只能有一个，为club.emperorws.aop.entity.Pointcut类型的参数；
+> 4. 尽量少使用Around，因为Around使用反射实现，使用Before + AfterReturning = Around代替为最佳效果；
+> 5. @Aspect注解的pointcut参数，支持execution(正则匹配)和@annotation(全词匹配)，例：@Aspect(order = 1, pointcut = "execution(\"* club.emperorws.demo.controller.Business*.\*(*)\") && @annotation(\"club.emperorws.demo.aspect.annotation.CatchException2\")")。
 
 ##### 代码示例
 
@@ -49,7 +51,7 @@ import cn.hutool.core.lang.Console;
  * @date: 2023/2/17 0:41
  * @description: BzAspect: 业务切面编程
  */
-@Aspect(order = 0, pointcutAnnotationClassPath = "club.emperorws.demo.aspect.annotation.CatchException")
+@Aspect(order = 1, pointcut = "execution(\"* club.emperorws.demo.controller.Business*.*(*)\") && @annotation(\"club.emperorws.demo.aspect.annotation.CatchException2\")")
 public class BzAspect {
 
     @AfterThrowing

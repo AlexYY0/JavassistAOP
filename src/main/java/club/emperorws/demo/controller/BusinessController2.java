@@ -1,4 +1,4 @@
-package club.emperorws.demo;
+package club.emperorws.demo.controller;
 
 import club.emperorws.demo.aspect.annotation.CatchException;
 import club.emperorws.demo.aspect.annotation.CatchException2;

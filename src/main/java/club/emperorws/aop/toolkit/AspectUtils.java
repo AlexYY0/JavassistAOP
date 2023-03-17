@@ -4,10 +4,11 @@ import club.emperorws.aop.annotation.*;
 import club.emperorws.aop.constant.Constants;
 import javassist.*;
 import javassist.bytecode.AnnotationsAttribute;
-import javassist.expr.ExprEditor;
-import javassist.expr.MethodCall;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 
 /**
  * {@link club.emperorws.aop.DoAspect}DoAspect代码过长的--->方法封装
@@ -22,6 +23,15 @@ public class AspectUtils {
         throw new IllegalStateException("Utility AspectUtils class can not use constructor.");
     }
 
+    /**
+     * 获取方法的完整信息
+     *
+     * @param method 方法
+     * @return 方法的完整信息
+     */
+    public static String getMethodInfoStr(CtMethod method) throws NotFoundException {
+        return Modifier.toString(method.getModifiers()) + " " + method.getReturnType().getName() + " " + method.getLongName();
+    }
     /**
      * 复制方法并添加复制的方法到原class中
      *

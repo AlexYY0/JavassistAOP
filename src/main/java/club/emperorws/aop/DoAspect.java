@@ -3,7 +3,9 @@ package club.emperorws.aop;
 import club.emperorws.aop.annotation.Aspect;
 import club.emperorws.aop.constant.Constants;
 import club.emperorws.aop.entity.AspectInfo;
+import club.emperorws.aop.toolkit.AspectUtils;
 import club.emperorws.aop.toolkit.ClassUtils;
+import club.emperorws.aop.toolkit.ExprUtils;
 import cn.hutool.core.lang.Console;
 import javassist.*;
 import javassist.bytecode.annotation.Annotation;
@@ -55,8 +57,7 @@ public class DoAspect {
                 //缓存匹配的注解-切面
                 Aspect aspect = (Aspect) clazz.getAnnotation(Aspect.class);
                 if (Objects.nonNull(aspect)) {
-                    String pointcutClassPath = aspect.pointcutAnnotationClassPath();
-                    ANNOTATION_ASPECT_MAP.put(pointcutClassPath, new AspectInfo(aspect.order(), clazz));
+                    ANNOTATION_ASPECT_MAP.put(aspect.pointcut().replaceAll("@", ""), new AspectInfo(aspect.order(), clazz));
                 }
                 clazz.detach();
             }
@@ -93,6 +94,10 @@ public class DoAspect {
                 //遍历class的所有方法
                 CtMethod[] methods = clazz.getDeclaredMethods();
                 for (CtMethod method : methods) {
+                    //私有方法不允许AOP切面编程
+                    if (Modifier.isPrivate(method.getModifiers())) {
+                        continue;
+                    }
                     boolean flag = methodAspect(clazz, method);
                     //避免重复definition Class而报错
                     if (!isLoadClass) {
@@ -123,25 +128,34 @@ public class DoAspect {
      * @throws Exception 异常
      */
     private static boolean methodAspect(CtClass clazz, CtMethod method) throws Exception {
-        boolean isLoadClass;
         //1. 遍历class方法里的所有注解
         List<AspectInfo> methodAspectList = new ArrayList<>();
         Object[] methodAnnotationObjs = method.getAvailableAnnotations();
+        //表达式参数
+        Map<String, Object> context = new HashMap<>(2);
+        context.put(Constants.METHOD_SIGNATURE, AspectUtils.getMethodInfoStr(method));
         for (Object methodAnnotationObj : methodAnnotationObjs) {
             Annotation methodAnnotation = ClassUtils.getProxyAnnotation(methodAnnotationObj);
+            context.put(Constants.METHOD_ANNOTATION_NAME, methodAnnotation.getTypeName());
             //存在切面编程，找出匹配的切面
-            if (ANNOTATION_ASPECT_MAP.containsKey(methodAnnotation.getTypeName())) {
-                methodAspectList.add(ANNOTATION_ASPECT_MAP.get(methodAnnotation.getTypeName()));
+            for (Map.Entry<String, AspectInfo> entry : ANNOTATION_ASPECT_MAP.entrySet()) {
+                String pointcut = entry.getKey();
+                //规则匹配，是切点
+                if (ExprUtils.<Boolean>executeExpression(pointcut, context)) {
+                    methodAspectList.add(entry.getValue());
+                }
             }
         }
         //2. 按照优先级排序
         List<AspectInfo> sortedMethodAspectList = methodAspectList.stream()
                 .sorted(Comparator.comparing(AspectInfo::getOrder).reversed())
                 .collect(Collectors.toList());
-        isLoadClass = !sortedMethodAspectList.isEmpty();
+        if (sortedMethodAspectList.isEmpty()) {
+            return false;
+        }
         //3. 开始切面编程
         codeByAnnotation(clazz, method, sortedMethodAspectList);
-        return isLoadClass;
+        return true;
     }
 
     /**

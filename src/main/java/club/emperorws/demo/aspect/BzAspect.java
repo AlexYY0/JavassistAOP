@@ -11,7 +11,7 @@ import cn.hutool.core.lang.Console;
  * @date: 2023/2/17 0:41
  * @description: BzAspect: 业务切面编程
  */
-@Aspect(order = 0, pointcutAnnotationClassPath = "club.emperorws.demo.aspect.annotation.CatchException")
+@Aspect(order = 0, pointcut = "@annotation(\"club.emperorws.demo.aspect.annotation.CatchException\")")
 public class BzAspect {
 
     @AfterThrowing

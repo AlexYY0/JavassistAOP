@@ -1,20 +1,13 @@
 package club.emperorws;
 
 import club.emperorws.aop.DoAspect;
+import club.emperorws.aop.toolkit.ClassUtils;
 import club.emperorws.demo.BusinessController;
 import club.emperorws.demo.aspect.annotation.CatchException;
-import javassist.ClassPool;
-import javassist.CtClass;
-import javassist.CtMethod;
-import javassist.CtNewMethod;
+import club.emperorws.demo.controller.BusinessController2;
+import javassist.*;
 
-import java.io.File;
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
 
 /**
  * @author: ${USER}
@@ -28,19 +21,18 @@ public class Main {
         //AOP字节码增强
         DoAspect.compileClass("club.emperorws.demo");
         //开始使用
-        //BusinessController bz = new BusinessController();
-        //bz.doSth("aa", 2);
-        Object bzObj = Class.forName("club.emperorws.demo.BusinessController").newInstance();
-        Method doSthMethod = bzObj.getClass().getDeclaredMethod("doSth", String.class, Integer.class);
-        Object aa = doSthMethod.invoke(bzObj, "aa", 2);
-        System.out.println("invoke result:" + aa);
+        BusinessController bz = new BusinessController();
+        bz.doSth("aa", 1);
+        /*BusinessController2 bz2 = new BusinessController2();
+        bz2.doSth("aa", 2);*/
+        //demoTest();
     }
 
-    private void demoTest() throws Exception {
+    private static void demoTest() throws Exception {
         // 获取默认的类池
         ClassPool pool = ClassPool.getDefault();
-        List<String> classNameList = getClassFile("club.emperorws.bz");
-        CtClass clazz = pool.getOrNull(classNameList.get(0));
+        Set<String> classNameList = ClassUtils.getClzFromPkg("club.emperorws.demo");
+        CtClass clazz = pool.getOrNull(classNameList.toArray(new String[classNameList.size()])[classNameList.size() - 1]);
         System.out.println("clazz.getPackageName():" + clazz.getPackageName());
         System.out.println("clazz.getSimpleName():" + clazz.getSimpleName());
         System.out.println("clazz.getName():" + clazz.getName());
@@ -49,6 +41,11 @@ public class Main {
             if (method.hasAnnotation(CatchException.class)) {
                 System.out.println("method.getLongName():" + method.getLongName());
                 System.out.println("method.getName():" + method.getName());
+                System.out.println("method.getSignature():" + method.getSignature());
+                System.out.println("method.getGenericSignature():" + method.getGenericSignature());
+                System.out.println("method.getReturnType():" + method.getReturnType().getName());
+                System.out.println("method.getModifiers():" + Modifier.toString(method.getModifiers()));
+                System.out.println("method info:" + Modifier.toString(method.getModifiers()) + " " + method.getReturnType().getName() + " " + method.getLongName());
                 //1. 复制方法
                 CtMethod srcMethod = CtNewMethod.copy(method, clazz, null);
                 //2. 给新的方法换一个名字
@@ -65,26 +62,9 @@ public class Main {
                 //method.addCatch("{ $e.getMessage(); throw $e;}", method.getExceptionTypes()[0]);
             }
         }
-        clazz.toClass();
+        //clazz.toClass();
         clazz.detach();
-        BusinessController bz = new BusinessController();
-        bz.doSth("aa", 2);
-    }
-
-    private static List<String> getClassFile(String pkg) throws UnsupportedEncodingException {
-        List<String> classNameList = new ArrayList<>();
-
-        String pkgDirName = pkg.replace('.', '/');
-        URL resource = Main.class.getClassLoader().getResource(pkgDirName);
-        // 获取包的物理路径
-        String pkgPath = URLDecoder.decode(resource.getFile(), "UTF-8");
-        File dir = new File(pkgPath);
-        File[] dirfiles = dir.listFiles(pathname -> pathname.isDirectory() || pathname.getName().endsWith("class"));
-        for (File classFile : dirfiles) {
-            String classFileName = classFile.getName();
-            String className = classFileName.substring(0, classFileName.length() - 6);
-            classNameList.add(pkg + "." + className);
-        }
-        return classNameList;
+        //BusinessController bz = new BusinessController();
+        //bz.doSth("aa", 2);
     }
 }

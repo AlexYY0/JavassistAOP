@@ -15,4 +15,14 @@ public interface Constants {
      * 字节码class池
      */
     ClassPool POOL = ClassPool.getDefault();
+
+    /**
+     * 切点方法签名
+     */
+    String METHOD_SIGNATURE = "methodSignature";
+
+    /**
+     * 切点方法注解名称
+     */
+    String METHOD_ANNOTATION_NAME = "methodAnnotationName";
 }
