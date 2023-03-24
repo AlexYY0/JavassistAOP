@@ -134,17 +134,16 @@ public class DoAspect {
         //表达式参数
         Map<String, Object> context = new HashMap<>(2);
         context.put(Constants.METHOD_SIGNATURE, AspectUtils.getMethodInfoStr(method));
-        for (Object methodAnnotationObj : methodAnnotationObjs) {
-            Annotation methodAnnotation = ClassUtils.getProxyAnnotation(methodAnnotationObj);
-            context.put(Constants.METHOD_ANNOTATION_NAME, methodAnnotation.getTypeName());
-            //存在切面编程，找出匹配的切面
-            for (Map.Entry<String, AspectInfo> entry : ANNOTATION_ASPECT_MAP.entrySet()) {
-                String pointcut = entry.getKey();
-                //规则匹配，是切点
-                if (Boolean.TRUE.equals(ExprUtils.<Boolean>executeExpression(pointcut, context))) {
-                    methodAspectList.add(entry.getValue());
-                }
+        if (Objects.nonNull(methodAnnotationObjs) && methodAnnotationObjs.length != 0) {
+            //有注解时的表达式执行：@annotation + 其他
+            for (Object methodAnnotationObj : methodAnnotationObjs) {
+                Annotation methodAnnotation = ClassUtils.getProxyAnnotation(methodAnnotationObj);
+                context.put(Constants.METHOD_ANNOTATION_NAME, methodAnnotation.getTypeName());
+                findAspectClass(methodAspectList, context);
             }
+        } else {
+            //其他非注解时的表达式执行：execution
+            findAspectClass(methodAspectList, context);
         }
         //2. 按照优先级排序
         List<AspectInfo> sortedMethodAspectList = methodAspectList.stream()
@@ -188,6 +187,23 @@ public class DoAspect {
             aspectAfter(method, aspectClass, methodMap);
             //环绕通知
             aspectAround(clazz, method, methodIsStatic, aspectClass, methodMap);
+        }
+    }
+
+    /**
+     * 找出切点method
+     *
+     * @param methodAspectList 切点method集合
+     * @param context          表达式环境变量
+     */
+    private static void findAspectClass(List<AspectInfo> methodAspectList, Map<String, Object> context) {
+        //存在切面编程，找出匹配的切面
+        for (Map.Entry<String, AspectInfo> entry : ANNOTATION_ASPECT_MAP.entrySet()) {
+            String pointcut = entry.getKey();
+            //规则匹配，是切点
+            if (Boolean.TRUE.equals(ExprUtils.<Boolean>executeExpression(pointcut, context))) {
+                methodAspectList.add(entry.getValue());
+            }
         }
     }
 }
