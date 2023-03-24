@@ -22,6 +22,6 @@ public class StringUtils {
                 .replaceAll("\\.", "\\\\.")
                 .replaceAll("\\(", "\\\\(")
                 .replaceAll("\\)", "\\\\)")
-                .replaceAll("\\*", ".*") + "$";
+                .replaceAll("\\*", ".*?") + "$";
     }
 }
