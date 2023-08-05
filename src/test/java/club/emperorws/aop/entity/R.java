@@ -1,4 +1,4 @@
-package club.emperorws.entity;
+package club.emperorws.aop.entity;
 
 /**
  * 返回结果封装

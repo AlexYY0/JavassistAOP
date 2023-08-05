@@ -1,13 +1,13 @@
-package club.emperorws;
+package club.emperorws.aop;
 
-import club.emperorws.aop.DoAspect;
 import club.emperorws.aop.toolkit.ClassUtils;
-import club.emperorws.demo.BusinessController;
-import club.emperorws.demo.aspect.annotation.CatchException;
-import club.emperorws.demo.controller.BusinessController2;
+import club.emperorws.aop.demo.BusinessController;
+import club.emperorws.aop.demo.aspect.annotation.CatchException;
+import club.emperorws.aop.demo.controller.BusinessController2;
 import javassist.*;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 import java.util.Set;
 
 /**
@@ -15,12 +15,16 @@ import java.util.Set;
  * @date: ${DATE} ${TIME}
  * @description: ${NAME}: ${description}
  */
-public class Main {
-    public static void main(String[] args) throws Exception {
+@DisplayName("Javassist AOP的相关测试用例")
+public class AopTest {
+
+    @DisplayName("aop简单测试测试")
+    @Test
+    public void aopTest(String[] args) throws Exception {
         //初始化
-        DoAspect.init("club.emperorws.demo.aspect");
+        DoAspect.init("club.emperorws.aop.demo.aspect");
         //AOP字节码增强
-        DoAspect.compileClass("club.emperorws.demo");
+        DoAspect.compileClass("club.emperorws.aop.demo");
         //开始使用
         BusinessController bz = new BusinessController();
         bz.doSth("aa", 1);
@@ -33,7 +37,7 @@ public class Main {
     private static void demoTest() throws Exception {
         // 获取默认的类池
         ClassPool pool = ClassPool.getDefault();
-        Set<String> classNameList = ClassUtils.getClzFromPkg("club.emperorws.demo");
+        Set<String> classNameList = ClassUtils.getClzFromPkg("club.emperorws.aop.demo");
         CtClass clazz = pool.getOrNull(classNameList.toArray(new String[classNameList.size()])[classNameList.size() - 1]);
         System.out.println("clazz.getPackageName():" + clazz.getPackageName());
         System.out.println("clazz.getSimpleName():" + clazz.getSimpleName());
@@ -58,7 +62,7 @@ public class Main {
                 StringBuilder sb = new StringBuilder();
                 sb.append("{try{System.out.println(\"args:\"+$args);")
                         .append("return ").append(srcMethodName).append("($$);")
-                        .append("}catch(Exception e){System.out.println(\"异常信息：\"+e.getMessage());return new club.emperorws.entity.R(\"1\",\"error\");}}");
+                        .append("}catch(Exception e){System.out.println(\"异常信息：\"+e.getMessage());return new club.emperorws.aop.entity.R(\"1\",\"error\");}}");
                 //4. 改变原有方法
                 method.setBody(sb.toString());
                 //method.addCatch("{ $e.getMessage(); throw $e;}", method.getExceptionTypes()[0]);

@@ -1,4 +1,4 @@
-package club.emperorws.demo.aspect;
+package club.emperorws.aop.demo.aspect;
 
 import club.emperorws.aop.annotation.*;
 import club.emperorws.aop.entity.Pointcut;
@@ -11,7 +11,7 @@ import cn.hutool.core.lang.Console;
  * @date: 2023/2/17 0:41
  * @description: BzAspect: 业务切面编程
  */
-@Aspect(order = 1, pointcut = "execution(\"* club.emperorws.demo.controller.Business*.*(*)\") && @annotation(\"club.emperorws.demo.aspect.annotation.CatchException2\")")
+@Aspect(order = 1, pointcut = "execution(\"* club.emperorws.aop.demo.controller.Business*.*(*)\") && @annotation(\"club.emperorws.aop.demo.aspect.annotation.CatchException2\")")
 public class BzAspect2 {
 
     @Before

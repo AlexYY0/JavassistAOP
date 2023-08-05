@@ -1,8 +1,8 @@
-package club.emperorws.demo;
+package club.emperorws.aop.demo.controller;
 
-import club.emperorws.demo.aspect.annotation.CatchException;
-import club.emperorws.demo.aspect.annotation.CatchException2;
-import club.emperorws.entity.R;
+import club.emperorws.aop.demo.aspect.annotation.CatchException;
+import club.emperorws.aop.demo.aspect.annotation.CatchException2;
+import club.emperorws.aop.entity.R;
 
 /**
  * 业务方法接口
@@ -11,24 +11,24 @@ import club.emperorws.entity.R;
  * @date: 2023/2/17 0:29
  * @description: BusinessController: 业务方法接口
  */
-public class BusinessController {
+public class BusinessController2 {
 
     @CatchException
     @CatchException2
     public R doSth(String aa,Integer bb) throws Exception {
-        System.out.println("Start doSth1-1");
+        System.out.println("Start doSth2-1");
         int a = 0, b = 1, c = 2;
         int r = a + b * c;
         //int e = 1 / 0;
-        System.out.println("End doSth1-1");
+        System.out.println("End doSth2-1");
         return new R("0", r);
     }
 
     public R doSth2(Integer aa,Integer bb) throws Exception {
-        System.out.println("Start doSth1-2");
+        System.out.println("Start doSth2-2");
         int r = aa + bb;
         //int e = 1 / 0;
-        System.out.println("End doSth1-2");
+        System.out.println("End doSth2-2");
         return new R("0", r);
     }
 }

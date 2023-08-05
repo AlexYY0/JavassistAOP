@@ -3,10 +3,10 @@ package club.emperorws.aop;
 import club.emperorws.aop.annotation.Aspect;
 import club.emperorws.aop.constant.Constants;
 import club.emperorws.aop.entity.AspectInfo;
+import club.emperorws.aop.exception.AopException;
 import club.emperorws.aop.toolkit.AspectUtils;
 import club.emperorws.aop.toolkit.ClassUtils;
 import club.emperorws.aop.toolkit.ExprUtils;
-import cn.hutool.core.lang.Console;
 import javassist.*;
 import javassist.bytecode.annotation.Annotation;
 
@@ -65,7 +65,7 @@ public class DoAspect {
             if (Objects.nonNull(clazz)) {
                 clazz.detach();
             }
-            Console.error(e, "DoAspect 初始化异常！");
+            throw new AopException("DoAspect 初始化异常！", e);
         }
     }
 
@@ -115,7 +115,31 @@ public class DoAspect {
             if (Objects.nonNull(clazz)) {
                 clazz.detach();
             }
-            Console.error(e, "DoAspect 字节码编程class异常！");
+            throw new AopException("DoAspect 字节码编程class异常！", e);
+        }
+    }
+
+    /**
+     * 字节码动态编译切面，生成切面编程后的class代码（主要用于热部署的class）
+     *
+     * @param needAspectClass 需要切点的类，即标注自定义注解的类（使用AOP的class）
+     */
+    public static void compileOneClass(CtClass needAspectClass) {
+        try {
+            if (Objects.isNull(needAspectClass)) {
+                return;
+            }
+            //遍历class的所有方法
+            CtMethod[] methods = needAspectClass.getDeclaredMethods();
+            for (CtMethod method : methods) {
+                //判断是不是私有方法，私有方法不允许AOP
+                if (Modifier.isPrivate(method.getModifiers())) {
+                    continue;
+                }
+                methodAspect(needAspectClass, method);
+            }
+        } catch (Exception e) {
+            throw new AopException("DoAspect's compileOneClass method has an error.", e);
         }
     }
 

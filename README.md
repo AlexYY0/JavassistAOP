@@ -12,13 +12,14 @@
 > 2. 切面注解的执行顺序（优先级order），从0开始，数值越小，优先级越高；
 > 3. 执行切面的方法，方法参数有且只能有一个，为club.emperorws.aop.entity.Pointcut类型的参数；
 > 4. 尽量少使用Around，因为Around使用反射实现，使用Before + AfterReturning = Around代替为最佳效果；
-> 5. @Aspect注解的pointcut参数，支持execution(正则匹配)和@annotation(全词匹配)，例：@Aspect(order = 1, pointcut = "execution(\"* club.emperorws.demo.controller.Business*.\*(*)\") && @annotation(\"club.emperorws.demo.aspect.annotation.CatchException2\")")。
+> 5. @Aspect注解的pointcut参数，支持execution(正则匹配)和@annotation(全词匹配)，例：@Aspect(order = 1, pointcut = "execution(\"* club.emperorws.aop.demo.controller.Business*.\*(*)\") && @annotation(\"club.emperorws.aop.demo.aspect.annotation.CatchException2\")")。
 
 ##### 代码示例
 
 ###### 1. 切面注解
+
 ```java
-package club.emperorws.demo.aspect.annotation;
+package club.emperorws.aop.demo.aspect.annotation;
 
 import java.lang.annotation.*;
 
@@ -37,8 +38,9 @@ public @interface CatchException {
 ```
 
 ###### 2. 切面方法
+
 ```java
-package club.emperorws.demo.aspect;
+package club.emperorws.aop.demo.aspect;
 
 import club.emperorws.aop.annotation.*;
 import club.emperorws.aop.entity.Pointcut;
@@ -51,7 +53,7 @@ import cn.hutool.core.lang.Console;
  * @date: 2023/2/17 0:41
  * @description: BzAspect: 业务切面编程
  */
-@Aspect(order = 1, pointcut = "execution(\"* club.emperorws.demo.controller.Business*.*(*)\") && @annotation(\"club.emperorws.demo.aspect.annotation.CatchException2\")")
+@Aspect(order = 1, pointcut = "execution(\"* club.emperorws.aop.demo.controller.Business*.*(*)\") && @annotation(\"club.emperorws.aop.demo.aspect.annotation.CatchException2\")")
 public class BzAspect {
 
     @AfterThrowing
@@ -83,11 +85,12 @@ public class BzAspect {
 }
 ```
 ###### 3. 使用切面注解
-```java
-package club.emperorws.demo;
 
-import club.emperorws.demo.aspect.annotation.CatchException;
-import club.emperorws.entity.R;
+```java
+package club.emperorws.aop.demo;
+
+import club.emperorws.aop.demo.aspect.annotation.CatchException;
+import club.emperorws.aop.entity.R;
 
 /**
  * 业务方法接口
@@ -99,7 +102,7 @@ import club.emperorws.entity.R;
 public class BusinessController {
 
     @CatchException
-    public R doSth(String aa,Integer bb) throws Exception {
+    public R doSth(String aa, Integer bb) throws Exception {
         System.out.println("Start do sth");
         int a = 0, b = 1, c = 2;
         int r = a + b * c;
